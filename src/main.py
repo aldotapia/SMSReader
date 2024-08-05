@@ -34,8 +34,8 @@ ctrl_pin = 2
 slave_addr = 1
 address = 0
 qty = 2
-period = 1 # minutes
-debug = True
+period = 10 # minutes
+debug = False
 
 # config modbus
 host = ModbusRTUMaster(
@@ -45,7 +45,7 @@ host = ModbusRTUMaster(
 )
 
 # set led pin to test reading the secrets file
-blink("LED", 3, 0.5)
+blink("LED", 3, 0.15)
 
 # print start
 printd('Starting program', debug)
@@ -90,26 +90,6 @@ printd(f'Alarm set to {alarm}', debug)
 
 printd('Program started', debug)
 
-
-#########
-#
-#auth_json = login(url, api_login, credentials, debug)
-#
-## check if is a dict
-#if isinstance(auth_json, dict):
-#    printd('Login successful', debug)
-#    #printd(f'Auth token: {auth_json["access_token"]}', debug)
-#
-#now = time.localtime()
-#time_stamp = f'{now[0]:04}-{now[1]:02}-{now[2]:02} {now[3]:02}:{(now[4]//period)*period:02}:00'
-#
-#data = {'station_id': station_id, 'date': time_stamp, 's1': 0, 's2': 0}
-#
-#token = auth_json.get('access_token')
-#
-#response = send_data(url, api_send, token, data, debug)
-###########
-
 token = None
 token_alarm = time.time() - 1
 
@@ -119,6 +99,9 @@ print('Starting main loop')
 while True:
     if time.time() > alarm:
         printd('Reading data', debug)
+
+        blink("LED", 5, 0.1)
+
         now = time.localtime()
         time_stamp = f'{now[0]:04}-{now[1]:02}-{now[2]:02} {now[3]:02}:{(now[4]//period)*period:02}:00'
         # read modbus
@@ -128,9 +111,13 @@ while True:
                 values = host.read_holding_registers(slave_addr=slave_addr, starting_addr=address, register_qty=qty, signed=False)
                 values = list(values)
                 printd(values, debug)
+                # physical signal
+                blink("LED", 5, 0.1)
                 t = 5
             except:
                 printd('Error reading data', debug)
+                # physical signal
+                blink("LED", 2, 2)
                 time.sleep(1)
                 t = t + 1
                 if t == 5:
@@ -146,6 +133,7 @@ while True:
         # check if connected
         if not wlan.isconnected():
             printd('Reconnecting to WiFi', debug)
+            blink("LED", 2, 2)
             wlan.connect(ssid, password)
             i = 0
             while wlan.isconnected() == False:
@@ -154,6 +142,7 @@ while True:
                 i = i + 1
                 # reset the board if it can't connect in 30 seconds
                 if i == 30:
+                    blink("LED", 1, 5)
                     machine.reset()
             printd('Connected to WiFi', debug)
             ntptime.settime()
@@ -173,12 +162,15 @@ while True:
             auth_json = login(url, api_login, credentials, debug)
             token = auth_json.get('access_token')
             token_alarm = time.time() + 84400
+            blink("LED", 5, 0.1)
 
         # check if is a dict
         if isinstance(auth_json, dict):
             printd('Login successful', debug)
+            blink("LED", 5, 0.1)
         else:
             printd('Error logging in', debug)
+            blink("LED", 2, 2)
 
         # send data
         i = 0
@@ -191,12 +183,15 @@ while True:
 
         if response == 200:
             printd('Data sent successfully', debug)
+            blink("LED", 5, 0.1)
         else:
             printd('Error sending data', debug)
+            blink("LED", 2, 2)
 
         now = time.localtime()
         min = now[4]
         sec = now[5]
         alarm = time.time() + (((min//period)*period + period) - min)*60 - (60 - sec) + 5
         gc.collect()
+        blink("LED", 5, 0.1)
     time.sleep(1)
